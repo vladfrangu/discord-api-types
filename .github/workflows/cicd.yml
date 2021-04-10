@@ -111,6 +111,7 @@ jobs:
 
       - name: Commit and Push New Code
         run: |
+          pushd out/
           git add --all .
           git commit -m "build: TSC build for ${GITHUB_SHA}" || true
           git push || true
