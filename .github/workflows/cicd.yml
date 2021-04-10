@@ -14,10 +14,10 @@ jobs:
       - name: Checkout Project
         uses: actions/checkout@v2
 
-      - name: Use Node.js 14
+      - name: Use Node.js 15
         uses: actions/setup-node@v2
         with:
-          node-version: 14
+          node-version: 15
 
       - name: Install Dependencies
         run: npm ci
@@ -40,10 +40,10 @@ jobs:
       - name: Checkout Project
         uses: actions/checkout@v2
 
-      - name: Use Node.js 14
+      - name: Use Node.js 15
         uses: actions/setup-node@v2
         with:
-          node-version: 14
+          node-version: 15
 
       - name: Install Dependencies
         run: npm ci
@@ -60,4 +60,57 @@ jobs:
         run: |
           git add --all .
           git commit -m "build: deno build for ${GITHUB_SHA}" || true
+          git push || true
+
+  build_branch:
+    name: Deploy to build branch
+    runs-on: ubuntu-latest
+
+    needs: testing
+    # Run workflow only if testing passes and conditions match
+    if: needs.testing.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v2
+
+      - name: Checkout Build Branch
+        uses: actions/checkout@v2
+        with:
+          ref: 'build'
+          path: 'out'
+
+      - name: Use Node.js 15
+        uses: actions/setup-node@v2
+        with:
+          node-version: 15
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Files
+        run: npm run prepublishOnly
+
+      - name: Set Git User and Email
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Copy New Code
+        run: |
+          echo -e "\n# Remove any old files in the build branch"
+          rm -rfv out/*
+
+          echo -e "\n# Move the generated code to the newly-checked-out branch, to be committed and pushed"
+          rsync -vaI package.json out/
+          rsync -vaI LICENSE out/
+          rsync -vaI README.md out/
+
+          rsync -vaI globals.{js,js.map,d.ts,d.ts.map,mjs} out/
+          rsync -vaIR {gateway,payloads,rest,rpc,voice,shortcuts}/**/*.{js,js.map,d.ts,d.ts.map,mjs} out/
+
+      - name: Commit and Push New Code
+        run: |
+          git add --all .
+          git commit -m "build: TSC build for ${GITHUB_SHA}" || true
           git push || true
